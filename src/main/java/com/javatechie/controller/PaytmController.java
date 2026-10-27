@@ -1,7 +1,5 @@
 package com.javatechie.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.javatechie.dto.PaymentRequest;
 import com.javatechie.dto.PaytmRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +8,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
 @RestController
@@ -18,6 +16,9 @@ public class PaytmController {
 
     @Value("${paytm.producer.topic.name}")
     private String topicName;
+
+    @Value("${paytm.producer.payment-batch-size:500}")
+    private int paymentBatchSize;
 
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
@@ -30,19 +31,20 @@ public class PaytmController {
     }
 
     @PostMapping("/paytm/payment")
-    public String doPayment(@RequestBody PaytmRequest<PaymentRequest> paytmRequest) throws JsonProcessingException {
-        for (int i = 1; i <= 500; i++) {
-
-            PaymentRequest paymentRequest = paytmRequest.getPayload();
-            paymentRequest.setSrcAc("SRC_AC" + i);
-            paymentRequest.setDestAc("SRC_DEST" + i);
-            paymentRequest.setAmount(new Random().nextInt(10000));
-            paymentRequest.setTransactionId(UUID.randomUUID().toString());
-            paymentRequest.setTxDate(new Date());
-            kafkaTemplate.send(topicName, paymentRequest);
+    public String doPayment(@RequestBody PaytmRequest<PaymentRequest> paytmRequest) {
+        PaymentRequest input = paytmRequest.getPayload();
+        for (int i = 1; i <= paymentBatchSize; i++) {
+            // Kafka sends are asynchronous: never mutate a payload after handing it to KafkaTemplate.
+            PaymentRequest event = new PaymentRequest(
+                    UUID.randomUUID().toString(),
+                    "SRC_AC" + i,
+                    "SRC_DEST" + i,
+                    ThreadLocalRandom.current().nextInt(10000),
+                    new Date()
+            );
+            kafkaTemplate.send(topicName, event);
         }
-        // send object as string
-        //kafkaTemplate.send(topicName,new ObjectMapper().writeValueAsString(paymentRequest));
-        return "payment instantiate successfully...";
+        // Enqueued locally; broker acknowledgements are not awaited by this demo endpoint.
+        return "payment events submitted for asynchronous publishing";
     }
 }
