@@ -32,7 +32,6 @@ public class PaytmController {
 
     @PostMapping("/paytm/payment")
     public String doPayment(@RequestBody PaytmRequest<PaymentRequest> paytmRequest) {
-        PaymentRequest input = paytmRequest.getPayload();
         for (int i = 1; i <= paymentBatchSize; i++) {
             // Kafka sends are asynchronous: never mutate a payload after handing it to KafkaTemplate.
             PaymentRequest event = new PaymentRequest(
