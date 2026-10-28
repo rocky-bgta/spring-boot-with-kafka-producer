@@ -2,7 +2,7 @@ name: Kafka producer unit tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/kafka-producer-full-suite-ci]
   pull_request:
 
 jobs:
@@ -15,5 +15,5 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Test payment publishing payload snapshots
-        run: mvn -B -Dtest=PaytmControllerTest test
+      - name: Run complete test suite and package
+        run: mvn -B --no-transfer-progress verify
